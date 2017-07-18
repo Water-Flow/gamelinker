@@ -10,22 +10,23 @@ local roundHasEnded = false
 local roundIsPreparing = true
 local playerConnected = ""
 local playerDisconnected = ""
-local isDebug = false
+local isDebug = true
 
 -- process answer from TeamSpeak
 socket:SetCallbackReceive(function(sock, receivedPacket)
     local receivedPacket = receivedPacket:ReadUntil("\n"):Trim()
+    MsgC( Color( 255, 0, 0 ), "[TS-Automute]RAW:"..MsgCreceivedPacket)
     if string.find(receivedPacket, "clid") then
         local clid = string.sub(receivedPacket, string.find(receivedPacket, "clid=")+5, string.find(receivedPacket, " "))
         local nick = string.sub(receivedPacket, string.find(receivedPacket, "client_nickname=")+16, string.len(receivedPacket))
         
         -- the player disconnected
         if playerDisconnected ~= "" then
-            packet:WriteStringRaw("clientedit clid="..clid.." client_is_talker=0\n")
+            packet:WriteStringRaw("clientedit clid="..clid.." client_is_talker=1\n")
             socket:Send(packet, true)
             playerDisconnected = ""
             if isDebug then
-                MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [PlayerDisconnected] Player "..nick.." is no talker.\n")
+                MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [PlayerDisconnected] Player "..nick.." is talker.\n")
             end
         -- the player connected
         elseif playerConnected ~= "" then
@@ -35,7 +36,7 @@ socket:SetCallbackReceive(function(sock, receivedPacket)
                 MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [PlayerConnected] Moved Player "..nick.." to right channel.\n")
             end
             
-            packet:WriteStringRaw("clientedit clid="..clid.." client_is_talker=0\n")
+            packet:WriteStringRaw("clientedit clid="..clid.." client_is_talker=1\n")
             socket:Send(packet, true)
             if isDebug then
                 MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [PlayerConnected] Player "..nick.." is talker.\n")
@@ -100,7 +101,7 @@ socket:Connect(config["ip"], tonumber(config["port"]))
 function playerIsAlive(name)
 --    name = convertSpecialChars(name)
     for k, v in pairs(player.GetAll()) do
-        if string.find(string.lower(v:Name()), string.lower(tostring(name))) ~= nil then
+        if string.find(string.lower(v:GetName()), string.lower(tostring(name))) ~= nil then
             if ( v:Alive() ) then  return true
             else return false end
         end
@@ -139,6 +140,7 @@ gameevent.Listen( "TTTEndRound" )
 gameevent.Listen( "TTTPrepareRound" )
 gameevent.Listen( "PlayerDisconnected" )
 gameevent.Listen( "PlayerConnect" )
+gameevent.Listen( "PlayerSpawn" )
 
 -- round is in preparing phase - all new players can get talkpower when joining
 hook.Add("TTTPrepareRound", "", function()
@@ -157,13 +159,25 @@ hook.Add("TTTBeginRound", "", function()
     if isDebug then
         MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Round start.\n")
     end
-
+    
+    
+    
     roundIsPreparing = false
 
     hook.Add( "PlayerDeath", "", function(target)
         
         if isDebug then
             MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Entity got killed.\n")
+        end
+        
+        packet:WriteStringRaw("clientfind pattern="..target:GetName().."\n")
+        socket:Send(packet, true)
+    end)
+    
+    hook.Add( "PlayerSpawn", "", function(target)
+        
+        if isDebug then
+            MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Entity got spawned.\n")
         end
         
         packet:WriteStringRaw("clientfind pattern="..target:GetName().."\n")
@@ -187,6 +201,7 @@ hook.Add("TTTEndRound", "", function()
         socket:Send(packet, true)
     end
 end)
+
 
 -- remove talkpower from player when disconnecting from server
 hook.Add("PlayerDisconnected", "", function(player)
