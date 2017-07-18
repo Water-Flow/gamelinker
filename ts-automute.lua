@@ -15,6 +15,7 @@ local isDebug = true
 -- process answer from TeamSpeak
 socket:SetCallbackReceive(function(sock, receivedPacket)
     local receivedPacket = receivedPacket:ReadUntil("\n"):Trim()
+    MsgC( Color( 255, 0, 0 ), "[TS-Automute]RAW:"..MsgCreceivedPacket)
     if string.find(receivedPacket, "clid") then
         local clid = string.sub(receivedPacket, string.find(receivedPacket, "clid=")+5, string.find(receivedPacket, " "))
         local nick = string.sub(receivedPacket, string.find(receivedPacket, "client_nickname=")+16, string.len(receivedPacket))
@@ -60,7 +61,7 @@ socket:SetCallbackReceive(function(sock, receivedPacket)
             packet:WriteStringRaw("clientedit clid="..clid.." client_is_talker=0\n")
             socket:Send(packet, true)
             if isDebug then
-                MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [else_dead_404] Player "..nick.." is no talker.\n")
+                MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Player "..nick.." is no talker.\n")
             end
         end
     -- player could not be found on TeamSpeak
@@ -98,15 +99,15 @@ socket:Connect(config["ip"], tonumber(config["port"]))
 -- @param name
 -- @return true if player is alive, nil when player has illegal characters, else false
 function playerIsAlive(name)
-    -- name = convertSpecialChars(name)
+--    name = convertSpecialChars(name)
     for k, v in pairs(player.GetAll()) do
-        if string.find(string.lower(v:Name()), string.lower(tostring(name))) ~= nil then
+        if string.find(string.lower(v:GetName()), string.lower(tostring(name))) ~= nil then
             if ( v:Alive() ) then  return true
             else return false end
         end
     end
     MsgC( Color( 255, 0, 0 ), "[TS-Automute] Player with nick "..name.." uses illegal Characters in his name!\n")
-    return true
+    return nil
 end
 
 -- Convert special characters in names
@@ -145,7 +146,7 @@ gameevent.Listen( "PlayerSpawn" )
 hook.Add("TTTPrepareRound", "", function()
     
     if isDebug then
-        MsgC( Color( 255, 0, 0 ), "[TS-Automute] [TTTPrepareRound] Round prepartation.\n")
+        MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Round prepartation.\n")
     end
     
     roundHasEnded = false
@@ -156,22 +157,17 @@ end)
 hook.Add("TTTBeginRound", "", function()
     
     if isDebug then
-        MsgC( Color( 255, 0, 0 ), "[TS-Automute] [TTTBeginRound] TTTBeginRound start.\n")
+        MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Round start.\n")
     end
     
     
     
     roundIsPreparing = false
 
-    for k, v in pairs( player.GetAll() ) do
-        packet:WriteStringRaw("clientfind pattern="..v:GetName().."\n")
-        socket:Send(packet, true)
-    end
-    
     hook.Add( "PlayerDeath", "", function(target)
         
         if isDebug then
-            MsgC( Color( 255, 0, 0 ), "[TS-Automute] [PlayerDeath] Entity got killed.\n")
+            MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Entity got killed.\n")
         end
         
         packet:WriteStringRaw("clientfind pattern="..target:GetName().."\n")
@@ -181,11 +177,11 @@ hook.Add("TTTBeginRound", "", function()
     hook.Add( "PlayerSpawn", "", function(target)
         
         if isDebug then
-            MsgC( Color( 255, 0, 0 ), "[TS-Automute] [PlayerSpawn] Entity got spawned.\n")
+            MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Entity got spawned.\n")
         end
         
-        --packet:WriteStringRaw("clientfind pattern="..target:Nick().."\n")
-        --socket:Send(packet, true)
+        packet:WriteStringRaw("clientfind pattern="..target:GetName().."\n")
+        socket:Send(packet, true)
     end)
 end)
 
@@ -193,7 +189,7 @@ end)
 hook.Add("TTTEndRound", "", function()
     
     if isDebug then
-        MsgC( Color( 255, 0, 0 ), "[TS-Automute] [TTTEndRound] Round end.\n")
+        MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Round end.\n")
     end
 
     hook.Remove( "PlayerDeath", "PlayerDeath_example")
