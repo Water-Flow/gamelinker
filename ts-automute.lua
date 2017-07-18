@@ -29,8 +29,8 @@ socket:SetCallbackReceive(function(sock, receivedPacket)
             end
         -- the player connected
         elseif playerConnected ~= "" then
-            -- packet:WriteStringRaw("clientmove clid="..clid.." cid="..config["channel-id"].."\n")
-            -- socket:Send(packet, true)
+            packet:WriteStringRaw("clientmove clid="..clid.." cid="..config["channel-id"].."\n")
+            socket:Send(packet, true)
             if isDebug then
                 MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [PlayerConnected] Dont Move Player "..nick.." to right channel.\n")
             end
@@ -49,18 +49,18 @@ socket:SetCallbackReceive(function(sock, receivedPacket)
                 MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [RoundHasEnded] Player "..nick.." is talker.\n")
             end
         -- the player is still alive
-        elseif playerIsAlive(nick) then
-            packet:WriteStringRaw("clientedit clid="..clid.." client_is_talker=1\n")
-            socket:Send(packet, true)
-            if isDebug then
-                MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [PlayerIsAlive] Player "..nick.." is talker.\n")
-            end
-        -- the player is dead
-        else
+        elseif playerIsDead(nick) then
             packet:WriteStringRaw("clientedit clid="..clid.." client_is_talker=0\n")
             socket:Send(packet, true)
             if isDebug then
-                MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Player "..nick.." is no talker.\n")
+                MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [playerIsDead] Player "..nick.." is no talker.\n")
+            end
+        -- the player is dead
+        else
+            packet:WriteStringRaw("clientedit clid="..clid.." client_is_talker=1\n")
+            socket:Send(packet, true)
+            if isDebug then
+                MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Player "..nick.." is talker.\n")
             end
         end
     -- player could not be found on TeamSpeak
@@ -97,16 +97,16 @@ socket:Connect(config["ip"], tonumber(config["port"]))
 -- Test if player is alive or not
 -- @param name
 -- @return true if player is alive, nil when player has illegal characters, else false
-function playerIsAlive(name)
+function playerIsDead(name)
 --    name = convertSpecialChars(name)
     for k, v in pairs(player.GetAll()) do
         if string.find(string.lower(v:Name()), string.lower(tostring(name))) ~= nil then
-            if ( v:Alive() ) then  return true
-            else return false end
+            if ( v:Alive() ) then  return false
+            else return true end
         end
     end
-    MsgC( Color( 255, 0, 0 ), "[TS-Automute] Player with nick "..name.." uses illegal Characters in his name!\n")
-    return true
+    MsgC( Color( 255, 0, 0 ), "[TS-Automute] Player with nick "..name.." uses maby illegal Characters in his name!\n")
+    return false
 end
 
 -- Convert special characters in names
@@ -197,6 +197,7 @@ hook.Add("TTTEndRound", "", function()
     
     for k, v in pairs( player.GetAll() ) do
         packet:WriteStringRaw("clientfind pattern="..v:GetName().."\n")
+        MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Round end:"..v:GetName().."\n")
         socket:Send(packet, true)
     end
 end)
@@ -207,8 +208,8 @@ hook.Add("PlayerDisconnected", "", function(player)
     if isDebug then
         MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Player "..playerDisconnected.." disconnected.\n")
     end
-    -- packet:WriteStringRaw("clientfind pattern="..playerDisconnected.."\n")
-    -- socket:Send(packet, true)
+        packet:WriteStringRaw("clientfind pattern="..playerDisconnected.."\n")
+        socket:Send(packet, true)
 end)
 
 -- move player to right channel and give talkpower when connecting to server and round is still in preparing phase
