@@ -10,12 +10,11 @@ local roundHasEnded = false
 local roundIsPreparing = true
 local playerConnected = ""
 local playerDisconnected = ""
-local isDebug = true
+local isDebug = false
 
 -- process answer from TeamSpeak
 socket:SetCallbackReceive(function(sock, receivedPacket)
     local receivedPacket = receivedPacket:ReadUntil("\n"):Trim()
-    MsgC( Color( 255, 0, 0 ), "[TS-Automute]RAW:"..MsgCreceivedPacket)
     if string.find(receivedPacket, "clid") then
         local clid = string.sub(receivedPacket, string.find(receivedPacket, "clid=")+5, string.find(receivedPacket, " "))
         local nick = string.sub(receivedPacket, string.find(receivedPacket, "client_nickname=")+16, string.len(receivedPacket))
@@ -30,10 +29,10 @@ socket:SetCallbackReceive(function(sock, receivedPacket)
             end
         -- the player connected
         elseif playerConnected ~= "" then
-            packet:WriteStringRaw("clientmove clid="..clid.." cid="..config["channel-id"].."\n")
+            -- packet:WriteStringRaw("clientmove clid="..clid.." cid="..config["channel-id"].."\n")
             socket:Send(packet, true)
             if isDebug then
-                MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [PlayerConnected] Moved Player "..nick.." to right channel.\n")
+                -- MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] [PlayerConnected] Moved Player "..nick.." to right channel.\n")
             end
             
             packet:WriteStringRaw("clientedit clid="..clid.." client_is_talker=1\n")
@@ -66,7 +65,7 @@ socket:SetCallbackReceive(function(sock, receivedPacket)
         end
     -- player could not be found on TeamSpeak
     elseif string.find(receivedPacket, "error id=512") then
-        MsgC( Color( 255, 0, 0 ), "[TS-Automute] Player could not be found!\n")
+        MsgC( Color( 255, 0, 0 ), "[TS-Automute] Invalid Packet from TS3"..receivedPacket.."\n")
     end
     socket:ReceiveUntil("\n")
 end)
@@ -99,9 +98,11 @@ socket:Connect(config["ip"], tonumber(config["port"]))
 -- @param name
 -- @return true if player is alive, nil when player has illegal characters, else false
 function playerIsAlive(name)
+name = string.sub(name, 1, 3)
 --    name = convertSpecialChars(name)
     for k, v in pairs(player.GetAll()) do
-        if string.find(string.lower(v:GetName()), string.lower(tostring(name))) ~= nil then
+        -- MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Compare] ;"..string.lower(v:Name()).."=="..string.lower(tostring(name)).."; \n")
+        if string.find(string.lower(v:Name()), string.lower(tostring(name))) ~= nil then
             if ( v:Alive() ) then  return true
             else return false end
         end
@@ -140,11 +141,10 @@ gameevent.Listen( "TTTEndRound" )
 gameevent.Listen( "TTTPrepareRound" )
 gameevent.Listen( "PlayerDisconnected" )
 gameevent.Listen( "PlayerConnect" )
-gameevent.Listen( "PlayerSpawn" )
+gameevent.Listen( "PlayerLoadout" )
 
 -- round is in preparing phase - all new players can get talkpower when joining
 hook.Add("TTTPrepareRound", "", function()
-    
     if isDebug then
         MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Round prepartation.\n")
     end
@@ -155,29 +155,27 @@ end)
 
 -- round is starting - new players dont get talkpower anymore and if player dies talkpower gets removed
 hook.Add("TTTBeginRound", "", function()
-    
     if isDebug then
         MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Round start.\n")
     end
-    
-    
-    
+
     roundIsPreparing = false
 
-    hook.Add( "PlayerDeath", "", function(target)
-        
+    -- unmute everybody again
+    
+
+    hook.Add( "PlayerDeath", "PlayerDeath", function(target)
         if isDebug then
-            MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Entity got killed.\n")
+            MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Entity got killed:"..target:GetName().."\n")
         end
         
         packet:WriteStringRaw("clientfind pattern="..target:GetName().."\n")
         socket:Send(packet, true)
     end)
-    
-    hook.Add( "PlayerSpawn", "", function(target)
         
+    hook.Add( "PlayerLoadout", "PlayerLoadout", function(target)
         if isDebug then
-            MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Entity got spawned.\n")
+            MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Entity spawned/respawned.\n")
         end
         
         packet:WriteStringRaw("clientfind pattern="..target:GetName().."\n")
@@ -187,12 +185,12 @@ end)
 
 -- give all players talkpower at the end of the round
 hook.Add("TTTEndRound", "", function()
-    
     if isDebug then
         MsgC( Color( 255, 0, 0 ), "[TS-Automute] [Debug] Round end.\n")
     end
 
-    hook.Remove( "PlayerDeath", "PlayerDeath_example")
+    hook.Remove( "PlayerDeath", "PlayerDeath")
+    hook.Remove( "PlayerSpawn", "PlayerSpawn")
     
     roundHasEnded = true
     
@@ -201,7 +199,6 @@ hook.Add("TTTEndRound", "", function()
         socket:Send(packet, true)
     end
 end)
-
 
 -- remove talkpower from player when disconnecting from server
 hook.Add("PlayerDisconnected", "", function(player)
